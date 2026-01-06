@@ -10,7 +10,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from config import Config
-from utils import setup_logging, set_seed, save_checkpoint
+from utils import setup_logging, set_seed, save_checkpoint, get_device
 from dataset import load_features_and_labels, create_fused_representation
 from models.vae_mlp import MLPVAE, train_vae_mlp
 from models.vae_conv import ConvVAE, train_vae_conv
@@ -102,7 +102,7 @@ def train_vae_mlp_pipeline(config: Config, args):
     logging.info("Training MLP-VAE (EASY Task)")
     logging.info("=" * 60)
     
-    device = torch.device(args.device)
+    device = get_device(device_str=args.device)
     
     # Load MFCC features
     features_dict, labels, metadata_df = load_features_and_labels(
@@ -224,7 +224,7 @@ def train_vae_conv_pipeline(config: Config, args):
     logging.info("Training Conv-VAE (MEDIUM Task)")
     logging.info("=" * 60)
     
-    device = torch.device(args.device)
+    device = get_device(device_str=args.device)
     
     # Load log-mel features and TF-IDF
     modalities = ['logmel']
@@ -353,7 +353,7 @@ def train_cvae_pipeline(config: Config, args):
     logging.info("Training CVAE (HARD Task)")
     logging.info("=" * 60)
     
-    device = torch.device(args.device)
+    device = get_device(device_str=args.device)
     
     # Load features with all modalities for full fusion
     modalities = ['mfcc', 'tfidf_svd'] if not args.skip_lyrics else ['mfcc']
@@ -485,8 +485,9 @@ def main():
                        help='Training mode')
     parser.add_argument('--config', type=str, default=None,
                        help='Path to config YAML')
-    parser.add_argument('--device', type=str, default='cpu',
-                       help='Device (cpu/cuda)')
+    parser.add_argument('--device', type=str, default='auto',
+                       choices=['cpu', 'cuda', 'mps', 'auto'],
+                       help='Device (cpu/cuda/mps/auto)')
     parser.add_argument('--epochs', type=int, default=None,
                        help='Number of epochs (overrides config)')
     parser.add_argument('--latent_dim', type=int, default=None,

@@ -216,8 +216,8 @@ def main():
                        choices=['tiny', 'base', 'small', 'medium', 'large'],
                        help='Whisper model size')
     parser.add_argument('--device', type=str, default='cpu',
-                       choices=['cpu', 'cuda'],
-                       help='Device for transcription')
+                       choices=['cpu', 'cuda', 'mps'],
+                       help='Device for transcription (cpu recommended for Whisper)')
     parser.add_argument('--compute_type', type=str, default='int8',
                        choices=['int8', 'float16', 'float32'],
                        help='Compute type (int8 for CPU, float16 for GPU)')

@@ -58,7 +58,7 @@ class Config:
     batch_size: int = 64
     learning_rate: float = 1e-3
     epochs: int = 50
-    device: str = "cpu"  # or "cuda"
+    device: str = "auto"  # 'auto', 'cpu', 'cuda', or 'mps'
     
     # Model architecture
     latent_dim: int = 16

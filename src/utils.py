@@ -45,23 +45,55 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+    # MPS doesn't have a separate seed function; torch.manual_seed handles it
     
     logging.info(f"Random seed set to: {seed}")
 
 
-def get_device(prefer_gpu: bool = True) -> torch.device:
+def get_device(prefer_gpu: bool = True, device_str: str = None) -> torch.device:
     """
-    Get the appropriate device (CPU or CUDA).
+    Get the appropriate device (CPU, CUDA, or MPS).
     
     Args:
-        prefer_gpu: Whether to prefer GPU if available
+        prefer_gpu: Whether to prefer GPU/MPS if available
+        device_str: Explicit device string ('cpu', 'cuda', 'mps', 'auto')
+                   If provided, overrides prefer_gpu
         
     Returns:
         torch.device object
     """
-    if prefer_gpu and torch.cuda.is_available():
-        device = torch.device('cuda')
-        logging.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    # If explicit device is specified
+    if device_str is not None and device_str != 'auto':
+        if device_str == 'mps':
+            if torch.backends.mps.is_available():
+                device = torch.device('mps')
+                logging.info("Using MPS (Apple Silicon)")
+            else:
+                logging.warning("MPS requested but not available, falling back to CPU")
+                device = torch.device('cpu')
+        elif device_str == 'cuda':
+            if torch.cuda.is_available():
+                device = torch.device('cuda')
+                logging.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            else:
+                logging.warning("CUDA requested but not available, falling back to CPU")
+                device = torch.device('cpu')
+        else:
+            device = torch.device('cpu')
+            logging.info("Using CPU")
+        return device
+    
+    # Auto-detect best device
+    if prefer_gpu or device_str == 'auto':
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+            logging.info(f"Using GPU: {torch.cuda.get_device_name(0)}")
+        elif torch.backends.mps.is_available():
+            device = torch.device('mps')
+            logging.info("Using MPS (Apple Silicon)")
+        else:
+            device = torch.device('cpu')
+            logging.info("Using CPU")
     else:
         device = torch.device('cpu')
         logging.info("Using CPU")
