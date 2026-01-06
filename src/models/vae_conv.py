@@ -103,7 +103,9 @@ class ConvVAE(nn.Module):
         return mu, logvar
     
     def reparameterize(self, mu, logvar):
-        """Reparameterization trick."""
+        """Reparameterization trick with clamping for numerical stability."""
+        # Clamp logvar to prevent numerical instability
+        logvar = torch.clamp(logvar, min=-20, max=20)
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
@@ -143,9 +145,15 @@ def vae_conv_loss(x_recon, x, mu, logvar, beta=1.0):
     # Reconstruction loss (MSE or BCE)
     recon_loss = F.mse_loss(x_recon, x, reduction='mean')
     
-    # KL divergence
-    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    kl_loss = kl_loss / x.size(0)
+    # Clamp logvar for numerical stability in KL computation
+    logvar = torch.clamp(logvar, min=-20, max=20)
+    
+    # KL divergence with numerical stability
+    kl_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+    
+    # Ensure no NaN
+    if torch.isnan(kl_loss):
+        kl_loss = torch.tensor(0.0, device=x.device)
     
     # Total loss
     total_loss = recon_loss + beta * kl_loss
@@ -184,12 +192,21 @@ def train_vae_conv(model: ConvVAE,
     if features.ndim == 3:
         features = np.expand_dims(features, axis=1)
     
+    # Replace NaN values and normalize features for numerical stability
+    features = np.nan_to_num(features, nan=0.0, posinf=1.0, neginf=-1.0)
+    
+    # Normalize to [0, 1] range for sigmoid output
+    feat_min = features.min()
+    feat_max = features.max()
+    if feat_max - feat_min > 0:
+        features = (features - feat_min) / (feat_max - feat_min)
+    
     # Prepare data
     dataset = TensorDataset(torch.FloatTensor(features))
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
-    # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # Optimizer with weight decay for regularization
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
     
     # Training loop
     train_losses = []
@@ -211,9 +228,10 @@ def train_vae_conv(model: ConvVAE,
             # Loss
             loss, recon_loss, kl_loss = vae_conv_loss(x_recon, x, mu, logvar, beta)
             
-            # Backward
+            # Backward with gradient clipping
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             
             epoch_loss += loss.item() * len(x)

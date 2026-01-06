@@ -130,6 +130,13 @@ def transcribe_clips(metadata_path: str,
         logging.info(f"Limited to {max_clips} clips for testing")
     
     # Load Whisper model
+    # Note: Whisper doesn't support MPS well due to sparse tensor operations
+    # Force CPU for transcription - it's fast enough for audio processing
+    if device == 'mps':
+        logging.warning("MPS not supported for Whisper (sparse tensor limitations). Using CPU instead.")
+        logging.info("Note: MPS works for train.py, but Whisper transcription runs best on CPU.")
+        device = 'cpu'
+    
     logging.info(f"Loading Whisper model: {model_size} on {device}")
     
     if use_faster_whisper:
